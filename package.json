@@ -1,0 +1,13 @@
+{
+  "name": "asf-detector",
+  "version": "1.0.0",
+  "description": "ASF Camera Scanner for pig lesion and redness detection",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve"
+  },
+  "author": "Your Name",
+  "license": "MIT",
+  "dependencies": {},
+  "devDependencies": {}
+}

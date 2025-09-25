@@ -1,0 +1,248 @@
+
+    <!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <!-- Change this -->
+    <title>ASF Scanner</title>
+    <link rel="stylesheet" href="style.css" />
+  </head>
+  <body>
+    <div id="app"></div>
+    <script type="module" src="index.mjs"></script>
+  </body>
+</html>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        background: #1e293b;
+        color: #f1f5f9;
+        margin: 0;
+        padding: 0;
+        text-align: center;
+      }
+      h1 {
+        padding: 10px;
+      }
+      #video {
+        width: 90%;
+        max-width: 600px;
+        margin-top: 12px;
+        border: 3px solid #334155;
+        border-radius: 12px;
+        background: black;
+      }
+      #controls {
+        margin: 15px 0;
+      }
+      button {
+        margin: 5px;
+        padding: 8px 14px;
+        border: none;
+        border-radius: 8px;
+        background: #2563eb;
+        color: white;
+        font-size: 14px;
+        cursor: pointer;
+      }
+      button:disabled {
+        background: #475569;
+        cursor: not-allowed;
+      }
+      #status {
+        margin: 12px;
+        font-weight: bold;
+        padding: 6px 12px;
+        border-radius: 8px;
+        display: inline-block;
+      }
+      .ok {
+        background: #22c55e;
+        color: white;
+      }
+      .warn {
+        background: #facc15;
+        color: black;
+      }
+      .danger {
+        background: #ef4444;
+        color: white;
+      }
+      #logs {
+        text-align: left;
+        margin: 20px auto;
+        max-width: 600px;
+        padding: 10px;
+        background: #0f172a;
+        border-radius: 8px;
+        max-height: 180px;
+        overflow-y: auto;
+      }
+      #infoModal {
+        display: none;
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: rgba(0, 0, 0, 0.6);
+        justify-content: center;
+        align-items: center;
+      }
+      #infoModalContent {
+        background: #1e293b;
+        padding: 20px;
+        border-radius: 12px;
+        width: 90%;
+        max-width: 400px;
+        text-align: left;
+        color: #f1f5f9;
+      }
+      #infoModalContent h3 {
+        margin-top: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>ASF Scanner</h1>
+    <div id="status" class="ok">Ready</div>
+    <br />
+    <video id="video" autoplay playsinline></video>
+
+    <div id="controls">
+      <button id="btnStart">Start Camera</button>
+      <button id="btnStop" disabled>Stop Camera</button>
+      <button id="btnSwitch" disabled>Switch Camera</button>
+      <button id="btnAnalyze" disabled>Start ASF Scan</button>
+      <button id="btnInfo">Instructions / Treatment</button>
+    </div>
+
+    <div id="logs"></div>
+
+    <!-- Modal -->
+    <div id="infoModal">
+      <div id="infoModalContent">
+        <h3>ASF Instructions / Temporary Treatment</h3>
+        <ul>
+          <li>🐖 Isolate sick pigs immediately from healthy ones.</li>
+          <li>🧼 Disinfect pens, tools, and footwear regularly.</li>
+          <li>🚫 Do not move pigs, pork, or feed to other farms.</li>
+          <li>📞 Contact your local veterinarian or agriculture office.</li>
+          <li>💧 Provide clean water and supportive feeding.</li>
+          <li>⚠️ There is no cure or vaccine — prevention is key.</li>
+        </ul>
+        <button id="btnCloseInfo">Close</button>
+      </div>
+    </div>
+
+    <script>
+      const video = document.getElementById("video");
+      const btnStart = document.getElementById("btnStart");
+      const btnStop = document.getElementById("btnStop");
+      const btnSwitch = document.getElementById("btnSwitch");
+      const btnAnalyze = document.getElementById("btnAnalyze");
+      const btnInfo = document.getElementById("btnInfo");
+      const btnCloseInfo = document.getElementById("btnCloseInfo");
+      const infoModal = document.getElementById("infoModal");
+      const statusEl = document.getElementById("status");
+      const logs = document.getElementById("logs");
+
+      let stream = null;
+      let currentFacing = "user"; // default to front
+
+      function log(msg) {
+        const t = new Date().toLocaleTimeString();
+        const el = document.createElement("div");
+        el.textContent = `[${t}] ${msg}`;
+        logs.prepend(el);
+        if (logs.childNodes.length > 50) logs.removeChild(logs.lastChild);
+      }
+
+      function setStatus(type, text) {
+        statusEl.className = type;
+        statusEl.textContent = text;
+      }
+
+      async function startCamera() {
+        try {
+          if (stream) stopCamera();
+
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: { facingMode: currentFacing },
+          });
+          video.srcObject = stream;
+
+          // force play
+          await video.play().catch((err) => log("Video play blocked: " + err));
+
+          setStatus("ok", "Camera Active");
+          log("Camera started");
+          btnStart.disabled = true;
+          btnStop.disabled = false;
+          btnSwitch.disabled = false;
+          btnAnalyze.disabled = false;
+        } catch (err) {
+          setStatus("danger", "Camera Error");
+          log("Camera error: " + err.message);
+        }
+      }
+
+      function stopCamera() {
+        if (stream) {
+          stream.getTracks().forEach((track) => track.stop());
+          stream = null;
+        }
+        video.srcObject = null;
+        setStatus("warn", "Camera Stopped");
+        log("Camera stopped");
+        btnStart.disabled = false;
+        btnStop.disabled = true;
+        btnSwitch.disabled = true;
+        btnAnalyze.disabled = true;
+      }
+
+      async function switchCamera() {
+        currentFacing = currentFacing === "user" ? "environment" : "user";
+        log("Switching camera...");
+        await startCamera();
+      }
+
+      function analyzeASF() {
+        if (!stream) {
+          log("Cannot analyze, camera is off");
+          return;
+        }
+        setStatus("warn", "Analyzing...");
+        log("ASF scan running...");
+        setTimeout(() => {
+          const detected = Math.random() < 0.3; // dummy 30% chance
+          if (detected) {
+            setStatus("danger", "ASF Signs Detected!");
+            log("ASF indicators found!");
+          } else {
+            setStatus("ok", "No ASF Signs");
+            log("No ASF signs found.");
+          }
+        }, 2000);
+      }
+
+      // Modal handling
+      btnInfo.addEventListener("click", () => {
+        infoModal.style.display = "flex";
+      });
+      btnCloseInfo.addEventListener("click", () => {
+        infoModal.style.display = "none";
+      });
+      window.addEventListener("click", (e) => {
+        if (e.target === infoModal) infoModal.style.display = "none";
+      });
+
+      // Button events
+      btnStart.addEventListener("click", startCamera);
+      btnStop.addEventListener("click", stopCamera);
+      btnSwitch.addEventListener("click", switchCamera);
+      btnAnalyze.addEventListener("click", analyzeASF);
+    </script>
+  </body>
+</html>
